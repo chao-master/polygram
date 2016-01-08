@@ -91,3 +91,6 @@
 [08-Jan-2016 10:45:10 UTC] AAHQjP8vRyp-gWiBhjoyv4HHj40JUjj7kaA
 ,AAHQjP8vRyp-gWiBhjoyv4HHj40JUjj7kaA
 [08-Jan-2016 10:45:25 UTC] PHP Fatal error:  Call to protected Tg::__construct() from invalid context in /home/member/ripp_/public_html/tgphpc/hook.php on line 33
+[08-Jan-2016 11:31:52 UTC] PHP Notice:  Undefined variable: page in /home/member/ripp_/public_html/tgphpc/Derpibooru/Derpibooru.php on line 120
+[08-Jan-2016 11:31:52 UTC] PHP Notice:  Undefined index: key in /home/member/ripp_/public_html/tgphpc/Derpibooru/Derpibooru.php on line 121
+[08-Jan-2016 11:31:52 UTC] PHP Notice:  Undefined index: key in /home/member/ripp_/public_html/tgphpc/Derpibooru/Derpibooru.php on line 78
