@@ -61,7 +61,7 @@ class Tg{
         $db = new SQLite3(get_class($this).".db");
         $db->busyTimeout(5000);
         if(static::$PRIVATE_VALS){
-            $cols = ["_user_ INT PRIMARY KEY NOT NULL"];
+            $cols = ["_user_ INT PRIMARY KEY NOT NULL","_last_ STRING"];
             foreach(static::$PRIVATE_VALS as $key => $val){
                 $type = gettype($val);
                 $key = '"'.$db->escapeString($key).'"';
@@ -88,12 +88,15 @@ class Tg{
                 $key = '"'.$db->escapeString($key).'"';
                 if(is_string($val)){
                     $val = "'".$db->escapeString($val)."'";
+                } elseif(is_null($val)){
+                    $val = "NULL";
                 }
                 $sets[] = "$key = $val";
             }
             $setsString = implode(",",$sets);
+            $this->infoLog("UPDATE private SET $setsString WHERE _user_ = $this->userId;");
             if (!$db->exec("UPDATE private SET $setsString WHERE _user_ = $this->userId;")){
-                $this->systemError($db->lastErrorMsg(),"A database error occoured when saving teh result of your action");
+                $this->systemError($db->lastErrorMsg(),"A database error occoured when saving the result of your action");
             }
 
         }
@@ -105,7 +108,6 @@ class Tg{
     * If the user dosen't exist a record is created for them and on_firstRun is called.
     */
     private function loadPersistant(){
-
         try{
             $db = new SQLite3(get_class($this).".db",SQLITE3_OPEN_READWRITE);
             $db->busyTimeout(5000);
@@ -168,6 +170,8 @@ class Tg{
         $this->messageId = $id;
         $this->chatType = $message["chat"]["type"];
 
+        $this->loadPersistant();
+
         if (!$text){
             //Not a text command
             return false;
@@ -183,9 +187,17 @@ class Tg{
                 return false;
             }
         } else {
-            //What we have here is basic text
-            //TODO check if there is a handler registred for the message it is in reply to
-            //If not we set a method to handle basic text.
+            $this->infoLog($text);
+            if ($this->userVals["_last_"]) {
+                //It's a reply to something
+                $text = $this->userVals["_last_"].$text;
+                $this->infoLog($text);
+                $cmdParams = explode(" ",$text);
+                $cmdNameP = [array_shift($cmdParams)];
+                $cmdName = $cmdNameP[0];
+            } else {
+                //If not we set a method to handle basic text.
+            }
         }
         //Get function and arguments ready
         try {
@@ -208,7 +220,6 @@ class Tg{
         if($pCountGiven < $pCountNeed){
             $this->userError("/$cmdName requires $pCountNeed paramaters but only $pCountGiven where given.");
         } else {
-            $this->loadPersistant();
             call_user_func_array([$this,$cmdName],$cmdParams);
             $this->savePersistant();
         }
@@ -296,21 +307,21 @@ class Tg{
 
         switch ($reply_markup){
             case self::REPLY_CLEAR_KEYBOARD_ALL:
-                $payload["reply_markup"] = ["hide_keyboard" => true, "selective" => false];
+                $payload["reply_markup"] = json_encode(["hide_keyboard" => true, "selective" => false]);
                 break;
             case self::REPLY_CLEAR_KEYBOARD_SELECTIVE:
-                $payload["reply_markup"] = ["hide_keyboard" => true, "selective" => true];
+                $payload["reply_markup"] = json_encode(["hide_keyboard" => true, "selective" => true]);
                 break;
             case self::REPLY_FORCE_ALL:
-                $payload["reply_markup"] = ["force_reply" => true, "selective" => false];
+                $payload["reply_markup"] = json_encode(["force_reply" => true, "selective" => false]);
                 break;
             case self::REPLY_FORCE_SELECTIVE:
-                $payload["reply_markup"] = ["force_reply" => true, "selective" => true];
+                $payload["reply_markup"] = json_encode(["force_reply" => true, "selective" => true]);
                 break;
             case null:
                 break;
             default:
-                $payload["reply_markup"] = $reply_markup;
+                $payload["reply_markup"] = json_encode($reply_markup);
         }
         if ($parse_mode !== null){
             $payload["parse_mode"] = $parse_mode;

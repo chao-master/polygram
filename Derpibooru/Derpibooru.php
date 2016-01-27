@@ -18,7 +18,7 @@ class Derpibooru extends Tg {
         $rtn = [
             "url" => "/search.json",
             "getKey" => "search",
-            "params" => [],
+            "params" => ["sf" => "score"],
             "noKey" => false,
             "page" => $page
         ];

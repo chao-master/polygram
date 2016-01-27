@@ -121,7 +121,10 @@ class Fuzzeon extends Tg {
             $msg .= $this->level("monster.defence")."/";
             $msg .= $this->level("monster.speed")."]";
 
-            $this->sendMessage($msg);
+            $this->userVals["_last_"] = "command_";
+            $this->sendMessage($msg,null,null,[
+                "keyboard"=>[["attack"]]
+            ]);
         }
     }
 
