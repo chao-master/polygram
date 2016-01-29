@@ -1,5 +1,5 @@
 <?php
-class Tg{
+abstract class Tg{
     const BASE_URI = "https://api.telegram.org/bot";
 
     const REPLY_CLEAR_KEYBOARD_ALL = 2;
@@ -55,85 +55,14 @@ class Tg{
     }
 
     /**
-    * Creates the persistance database and sets up the tables
+    * Saves the persitant userVals
     */
-    private function makeDatabase(){
-        $db = new SQLite3(get_class($this).".db");
-        $db->busyTimeout(5000);
-        if(static::$PRIVATE_VALS){
-            $cols = ["_user_ INT PRIMARY KEY NOT NULL","_last_ STRING"];
-            foreach(static::$PRIVATE_VALS as $key => $val){
-                $type = gettype($val);
-                $key = '"'.$db->escapeString($key).'"';
-                if ($type == "string"){
-                    $val = "'".$db->escapeString($val)."'";
-                }
-                $cols[] = "$key $type DEFAULT $val";
-            }
-            $colString = "(".implode(",",$cols).")";
-            $db->exec("CREATE TABLE private $colString;");
-        }
-        return $db;
-    }
+    abstract protected function savePersistant();
 
     /**
-    * Saves the persistance userVals to the database
+    * Loads the persitant userVals, should call on_firstRun if none exist and return the defaults
     */
-    private function savePersistant(){
-        $db = new SQLite3(get_class($this).".db",SQLITE3_OPEN_READWRITE);
-        $db->busyTimeout(5000);
-        if(static::$PRIVATE_VALS){
-            $sets = [];
-            foreach($this->userVals as $key => $val){
-                $key = '"'.$db->escapeString($key).'"';
-                if(is_string($val)){
-                    $val = "'".$db->escapeString($val)."'";
-                } elseif(is_null($val)){
-                    $val = "NULL";
-                }
-                $sets[] = "$key = $val";
-            }
-            $setsString = implode(",",$sets);
-            $this->infoLog("UPDATE private SET $setsString WHERE _user_ = $this->userId;");
-            if (!$db->exec("UPDATE private SET $setsString WHERE _user_ = $this->userId;")){
-                $this->systemError($db->lastErrorMsg(),"A database error occoured when saving the result of your action");
-            }
-
-        }
-        $db->close();
-    }
-
-    /**
-    * Loads the persistance userVals from the database
-    * If the user dosen't exist a record is created for them and on_firstRun is called.
-    */
-    private function loadPersistant(){
-        try{
-            $db = new SQLite3(get_class($this).".db",SQLITE3_OPEN_READWRITE);
-            $db->busyTimeout(5000);
-        } catch (Exception $e) {
-            $db = $this->makeDatabase();
-        }
-        if($this->chatType == "private" || $this->chatType == "query"){
-            if(static::$PRIVATE_VALS){
-                $stmt = $db->prepare("SELECT * FROM private WHERE _user_=:uid");
-                $stmt->bindValue(":uid",$this->userId);
-                $nObj = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
-                if($nObj){
-                    $this->userVals = $nObj;
-                } elseif ($this->chatType != "query") {
-                    $stmt = $db->prepare("INSERT INTO private (\"_user_\") VALUES (:uid)");
-                    $stmt->bindValue(":uid",$this->userId);
-                    $stmt->execute();
-                    $this->userVals = static::$PRIVATE_VALS;
-                    $this->on_firstRun();
-                }
-            } else {
-                $this->userVals = [];
-            }
-        }
-        $db->close();
-    }
+    abstract protected function loadPersistant();
 
     /**
     * Handles input from the webhook.
@@ -154,7 +83,7 @@ class Tg{
     * the text is split by spaces up the number of paramaters,
     * because of this no paramater (except the last) can contain a space
     * TODO - make it call on_text for basic text messages
-    * TODO - make it call registered handlers if a reply to a previous message
+    * ~~TODO - make it call registered handlers if a reply to a previous message~~
     * TODO - corretlly handle non-text messages
     */
     private function handleMessage($message){
@@ -187,16 +116,15 @@ class Tg{
                 return false;
             }
         } else {
-            $this->infoLog($text);
             if ($this->userVals["_last_"]) {
                 //It's a reply to something
                 $text = $this->userVals["_last_"].$text;
-                $this->infoLog($text);
                 $cmdParams = explode(" ",$text);
                 $cmdNameP = [array_shift($cmdParams)];
                 $cmdName = $cmdNameP[0];
             } else {
-                //If not we set a method to handle basic text.
+                return;
+                //TODO If not we set a method to handle basic text.
             }
         }
         //Get function and arguments ready
