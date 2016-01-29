@@ -1,6 +1,6 @@
 <?php
     include_once "Tg.php";
-    class TgSession extends Tg {
+    class TgSqlite extends Tg {
         /**
         * Creates the persistance database and sets up the tables
         */
