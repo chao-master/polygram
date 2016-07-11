@@ -7,6 +7,10 @@ abstract class Tg{
     const REPLY_FORCE_ALL = 4;
     const REPLY_FORCE_SELECTIVE = 5;
 
+    static protected $METHOD_TYPES = [
+        "audio","document","sticker","video","voice","contact","location","venue"
+    ];
+
     static protected $BOT_KEY;
 
     static protected $PRIVATE_VALS = [];
@@ -80,7 +84,7 @@ abstract class Tg{
     * Checks the incomming message and delegates it to the apporiate command_* function
     * Correctlly identifies /command@bot - filtering out commands for other BOT_USERNAME
     * The paramaters passed to the command_* function are made up of the extra text in the message
-    * the text is split by spaces up the number of paramaters,
+    * the text is split by spaces upto the number of paramaters,
     * because of this no paramater (except the last) can contain a space
     * TODO - make it call on_text for basic text messages
     * ~~TODO - make it call registered handlers if a reply to a previous message~~
@@ -103,7 +107,7 @@ abstract class Tg{
 
         if (!$text){
             //Not a text command
-            return false;
+            return $this->handleNonTextMessage($message);
         } elseif (substr($text,0,1) == "/"){
             //We have a command
             $cmdParams = explode(" ",$text);
@@ -150,6 +154,18 @@ abstract class Tg{
         } else {
             call_user_func_array([$this,$cmdName],$cmdParams);
             $this->savePersistant();
+        }
+    }
+
+    /**
+    * Handles a non text message by calling the apporiate on_ method
+    */
+    private function handleNonTextMessage($message){
+        foreach(static::$METHOD_TYPES as $v){
+            if (array_key_exists($v,$message)){
+                $func = "on_$v";
+                return call_user_func([$this,"on_$v"],$message[$v],$message);
+            }
         }
     }
 
@@ -304,19 +320,22 @@ abstract class Tg{
 
     //Provides the docstring for on_inlineQuery if defined
     //There is no docstring for this function so it dosen't apear in /help
+    //If on_inlineQuery is overloaded a keyboard button to start an inline chat will apear
     protected function command_helpinline(){
         $inspect = new ReflectionMethod($this, "on_inlineQuery");
+        $keyboard = null;
         if($inspect->getDeclaringClass()->getName() !== get_class()){
             $docStrings = explode("\n",$inspect->getDocComment());
             $msg = "";
             foreach($docStrings as $n => $line){
                 if ($n == 0 || $n == count($docString)-1) continue;
                 $msg .= substr(trim($line),2) . "\n";
+                $keyboard = [inline_keyboard => [[["switch_inline_query" => "", "text" => "Try it"]]]];
             }
         } else {
             $msg = "This is not an inline query bot, for general command help try /help";
         }
-        $this->sendMessage($msg);
+        $this->sendMessage($msg,null,null,$keyboard);
     }
 
     //The follow functions are hooks to be overridden
