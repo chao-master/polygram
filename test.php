@@ -46,7 +46,7 @@
             print "Removing webhook\n";
             $url = "";
         } else {
-            $url = "$address/hook.php?class=$cls&key=".$cls::BOT_KEY;
+            $url = "$address/hook.php?class=$cls&key=".$cls::getKey();
             print "Setting up webhook to point to $url\n";
         }
         $rCode = $bot->sendPackage("setWebhook",["url"=>$url]);
@@ -64,18 +64,26 @@
     }
 
     if ($argc < 1) {
-        die("Bot name needed");
+        die("Bot name needed for first argument");
     }
-    $className = str_replace(".php","",$argv[1]);
 
-    print "Loading bot $argv[1]\n";
-    include $argv[1];
+    $className=$argv[1];
+
+    set_include_path(get_include_path() . PATH_SEPARATOR . getcwd());
+    chdir($className);
+
+
+    print "Loading bot $className";
+    include "$className.php";
 
     $bot = new $className();
     testDetails($bot,$className);
-    testWebhook($bot,$className);
-    if ($argc >= 3 && $argv[2]){
-        setupWebhook($bot,$className,$argv[2]);
+    if (!testWebhook($bot,$className)){
+        if ($argc >= 3 && $argv[2]){
+            setupWebhook($bot,$className,$argv[2]);
+        } else {
+            print "rerun with the path of the webhook base to add";
+        }
     }
 
     //checkDatabase($bot,$className);

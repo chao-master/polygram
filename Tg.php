@@ -1,14 +1,16 @@
 <?php
 abstract class Tg{
     const BASE_URI = "https://api.telegram.org/bot";
+    const FILE_BASE_URI = "https://api.telegram.org/file/bot";
 
     const REPLY_CLEAR_KEYBOARD_ALL = 2;
     const REPLY_CLEAR_KEYBOARD_SELECTIVE = 3;
     const REPLY_FORCE_ALL = 4;
     const REPLY_FORCE_SELECTIVE = 5;
+    const FILE_DOWNLOAD = 1;
 
     static protected $METHOD_TYPES = [
-        "audio","document","sticker","video","voice","contact","location","venue"
+        "audio","document","sticker","video","voice","contact","location","venue","photo"
     ];
 
     static protected $BOT_KEY;
@@ -40,7 +42,7 @@ abstract class Tg{
     * Alerts the user that sent us the message to an error that has happened.
     */
     protected function userError($msg){
-        $this->sendMessage($msg,true,$this->userId);
+        $this->sendMessage($msg,true,$this->userId,null,null,null,true);
     }
 
     /**
@@ -208,13 +210,16 @@ abstract class Tg{
             CURLOPT_POSTFIELDS      => $payload
         ]);
         $result = curl_exec($curl);
-        if(curl_errno($curl)){
+          if(curl_errno($curl)){
             $this->systemError("Curl error $ch when sending $method ".print_r($payload,true),"An error occoured sending the reply");
             return curl_errno($curl);
         }
 
-        $result = json_decode($result,true);
+        if($method === static::FILE_DOWNLOAD){
+            return $result;
+        }
 
+        $result = json_decode($result,true);
         if(!$result["ok"]){
             if(!$supressError){
                 $this->systemError("Telegram error ".$result["description"]." when sending $method ".print_r($payload,true),"An error occoured when sending the reply");
@@ -240,8 +245,9 @@ abstract class Tg{
     * @param $reply_markup          one of the REPLY_* constants
     * @param $disable_web_preview   If web link previews should be disabled in the message, defaults to false
     * @param $parse_mode            Parsing mode to use, deafults to null (none) other option is "markdown"
+    * @param $supress_error         Passed stright to sendPackage
     */
-    function sendMessage($text,$reply_to=null,$chat_id=null,$reply_markup=null,$disable_web_preview=false,$parse_mode=null){
+    function sendMessage($text,$reply_to=null,$chat_id=null,$reply_markup=null,$disable_web_preview=false,$parse_mode=null,$supress_error=false){
         $payload = [
             "chat_id"               => $chat_id !== null  ? $chat_id         : $this->chatId,
             "reply_to"              => $reply_to === true ? $this->messageId : $reply_to,
@@ -270,7 +276,24 @@ abstract class Tg{
         if ($parse_mode !== null){
             $payload["parse_mode"] = $parse_mode;
         }
-        return $this->sendPackage("sendMessage",$payload);
+        return $this->sendPackage("sendMessage",$payload,$supress_error);
+    }
+
+    /**
+    * Downloads the file with the given file_id
+    * @parama $fileId       The identifier for the file to download
+    * @parama $urlOnly      if given the file isn't downloaded but it's url is returned
+    * @returns              The downloaded file (as string) or the url (valid for 1hr)
+    */
+    function downloadFile($fileId,$urlOnly=false){
+        $fileObj = $this->sendPackage("getFile",["file_id"=>$fileId]);
+        $this->infoLog($fileObj);
+        $url = static::FILE_BASE_URI . static::BOT_ID . ":" . static::$BOT_KEY . "/" . $fileObj["file_path"];
+        if($urlOnly){
+            return $url;
+        } else {
+            return file_get_contents($url);
+        }
     }
 
     /**
@@ -296,7 +319,7 @@ abstract class Tg{
             $msg = "";
             //Check on_inlineQuery
             $inspect = new ReflectionMethod($this, "on_inlineQuery");
-            if($inspect->getDeclaringClass()->getName() !== "TG"){
+            if($inspect->getDeclaringClass()->getName() !== "Tg"){
                 $docString = $inspect->getDocComment();
                 $docString = substr(trim(explode("\n",$docString)[1]),2);
                 $msg .= static::BOT_USERNAME ." is an inline bot which $docString";
