@@ -308,12 +308,16 @@ abstract class Tg{
     protected function command_help($command=null){
         if ($command){
             $method = "command_$command";
-            $inspect =  new ReflectionMethod($this, $method);
-            $docStrings = explode("\n",$inspect->getDocComment());
-            $msg = "/$command - ";
-            foreach($docStrings as $n => $line){
-                if ($n == 0 || $n == count($docString)-1) continue;
-                $msg .= substr(trim($line),2) . "\n";
+            try {
+                $inspect =  new ReflectionMethod($this, $method);
+                $docStrings = explode("\n",$inspect->getDocComment());
+                $msg = "/$command - ";
+                foreach($docStrings as $n => $line){
+                    if ($n == 0 || $n == count($docString)-1) continue;
+                    $msg .= substr(trim($line),2) . "\n";
+                }
+            } catch (Exception $e){
+                $msg = "`$command` is not a known command";
             }
         } else {
             $msg = "";
